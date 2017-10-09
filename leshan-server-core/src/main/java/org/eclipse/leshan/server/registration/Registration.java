@@ -262,7 +262,11 @@ public class Registration implements Serializable {
     }
 
     public boolean isAlive() {
-        return lastUpdate.getTime() + lifeTimeInSec * 1000 > System.currentTimeMillis();
+        return isAlive(0);
+    }
+
+    public boolean isAlive(long clemencyInSec) {
+        return lastUpdate.getTime() + lifeTimeInSec * 1000 + clemencyInSec * 1000 > System.currentTimeMillis();
     }
 
     public Map<String, String> getAdditionalRegistrationAttributes() {
