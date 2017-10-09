@@ -212,8 +212,7 @@ public class RedisRegistrationStore implements CaliforniumRegistrationStore, Sta
             if (data == null) {
                 return null;
             }
-            Registration r = deserializeReg(data);
-            return r.isAlive(clemency) ? r : null;
+            return deserializeReg(data);
         }
     }
 
