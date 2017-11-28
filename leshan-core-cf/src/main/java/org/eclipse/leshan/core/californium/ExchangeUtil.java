@@ -18,6 +18,7 @@ package org.eclipse.leshan.core.californium;
 import java.net.InetSocketAddress;
 import java.security.Principal;
 import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -46,7 +47,9 @@ public class ExchangeUtil {
                 Matcher endpointMatcher = Pattern.compile("CN=(.*?)(,|$)").matcher(senderIdentity.getName());
                 if (endpointMatcher.find()) {
                     String x509CommonName = endpointMatcher.group(1);
-                    return Identity.x509(peerAddress, x509CommonName);
+                    X509CertPath certPath = extractX509CertPath(senderIdentity);
+
+                    return Identity.x509(peerAddress, x509CommonName, certPath);
                 } else {
                     throw new IllegalStateException(
                             "Unable to extract sender identity : can not get common name in certificate");
@@ -55,5 +58,13 @@ public class ExchangeUtil {
             throw new IllegalStateException("Unable to extract sender identity : unexpected type of Principal");
         }
         return Identity.unsecure(peerAddress);
+    }
+
+    private static X509CertPath extractX509CertPath(Principal senderIdentity) {
+        if (senderIdentity instanceof X509CertPath) {
+            return (X509CertPath)senderIdentity;
+        } else {
+            return null;
+        }
     }
 }

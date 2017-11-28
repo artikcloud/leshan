@@ -136,6 +136,7 @@ public class SecurityCheck {
         // Manage X509 certificate authentication
         // ----------------------------------------------------
         String x509CommonName = clientIdentity.getX509CommonName();
+        // TODO: use custom identity checker
 
         if (!securityInfo.useX509Cert()) {
             LOG.debug("Client '{}' is not supposed to use X509 certificate to authenticate", endpoint);

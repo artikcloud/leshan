@@ -18,6 +18,8 @@ package org.eclipse.leshan.client.californium;
 import org.eclipse.californium.core.network.CoapEndpoint;
 import org.eclipse.californium.core.network.config.NetworkConfig;
 import org.eclipse.californium.core.network.config.NetworkConfig.Keys;
+import org.eclipse.californium.elements.tcp.TcpClientConnector;
+import org.eclipse.californium.elements.tcp.TlsClientConnector;
 import org.eclipse.californium.scandium.DTLSConnector;
 import org.eclipse.californium.scandium.config.DtlsConnectorConfig;
 import org.eclipse.californium.scandium.config.DtlsConnectorConfig.Builder;
@@ -28,6 +30,9 @@ import org.eclipse.leshan.client.object.Security;
 import org.eclipse.leshan.client.object.Server;
 import org.eclipse.leshan.client.resource.LwM2mObjectEnabler;
 import org.eclipse.leshan.client.resource.ObjectsInitializer;
+import org.eclipse.leshan.client.servers.DmServerInfo;
+import org.eclipse.leshan.client.servers.ServersInfo;
+import org.eclipse.leshan.client.servers.ServersInfoExtractor;
 import org.eclipse.leshan.core.californium.EndpointFactory;
 import org.eclipse.leshan.core.request.BindingMode;
 import org.eclipse.leshan.util.Validate;
@@ -42,9 +47,16 @@ import java.util.Map;
 /**
  * Helper class to build and configure a Californium based Leshan Lightweight M2M client.
  */
-public class LeshanClientBuilder {
+public class LeshanTCPClientBuilder {
 
-    private static final Logger LOG = LoggerFactory.getLogger(LeshanClientBuilder.class);
+    private SSLContext sslContext;
+
+    public LeshanTCPClientBuilder setSSLContext(SSLContext sslContext) {
+        this.sslContext = sslContext;
+        return this;
+    }
+
+    private static final Logger LOG = LoggerFactory.getLogger(LeshanTCPClientBuilder.class);
 
     private final String endpoint;
 
@@ -63,7 +75,7 @@ public class LeshanClientBuilder {
 
     /**
      * Creates a new instance for setting the configuration options for a {@link LeshanClient} instance.
-     * 
+     *
      * The builder is initialized with the following default values:
      * <ul>
      * <li><em>local address</em>: a local address and an ephemeral port (picked up during binding)</li>
@@ -77,10 +89,10 @@ public class LeshanClientBuilder {
      * </ul>
      * </li>
      * </ul>
-     * 
+     *
      * @param endpoint the end-point to identify the client on the server
      */
-    public LeshanClientBuilder(String endpoint) {
+    public LeshanTCPClientBuilder(String endpoint) {
         Validate.notEmpty(endpoint);
         this.endpoint = endpoint;
     }
@@ -88,7 +100,7 @@ public class LeshanClientBuilder {
     /**
      * Sets the local non-secure end-point address
      */
-    public LeshanClientBuilder setLocalAddress(String hostname, int port) {
+    public LeshanTCPClientBuilder setLocalAddress(String hostname, int port) {
         if (hostname == null) {
             this.localAddress = new InetSocketAddress(port);
         } else {
@@ -100,7 +112,7 @@ public class LeshanClientBuilder {
     /**
      * Sets the local secure end-point address
      */
-    public LeshanClientBuilder setLocalSecureAddress(String hostname, int port) {
+    public LeshanTCPClientBuilder setLocalSecureAddress(String hostname, int port) {
         if (hostname == null) {
             this.localSecureAddress = new InetSocketAddress(port);
         } else {
@@ -116,7 +128,7 @@ public class LeshanClientBuilder {
      * Warning : The Security ObjectEnabler should not contains 2 or more entries with the same identity. This is not a
      * LWM2M specification constraint but an implementation limitation.
      */
-    public LeshanClientBuilder setObjects(List<? extends LwM2mObjectEnabler> objectEnablers) {
+    public LeshanTCPClientBuilder setObjects(List<? extends LwM2mObjectEnabler> objectEnablers) {
         this.objectEnablers = objectEnablers;
         return this;
     }
@@ -124,32 +136,15 @@ public class LeshanClientBuilder {
     /**
      * Set the Californium/CoAP {@link NetworkConfig}.
      */
-    public LeshanClientBuilder setCoapConfig(NetworkConfig config) {
+    public LeshanTCPClientBuilder setCoapConfig(NetworkConfig config) {
         this.coapConfig = config;
-        return this;
-    }
-
-    /**
-     * Set the Scandium/DTLS Configuration : {@link DtlsConnectorConfig}.
-     */
-    public LeshanClientBuilder setDtlsConfig(DtlsConnectorConfig.Builder config) {
-        this.dtlsConfigBuilder = config;
-        return this;
-    }
-
-    /**
-     * Used to create custom CoAP endpoint, this is only for advanced users. <br>
-     * DTLSConnector is expected for secured endpoint.
-     */
-    public LeshanClientBuilder setEndpointFactory(EndpointFactory endpointFactory) {
-        this.endpointFactory = endpointFactory;
         return this;
     }
 
     /**
      * deactivate unsecured CoAP endpoint
      */
-    public LeshanClientBuilder disableUnsecuredEndpoint() {
+    public LeshanTCPClientBuilder disableUnsecuredEndpoint() {
         this.noUnsecuredEndpoint = true;
         return this;
     }
@@ -157,7 +152,7 @@ public class LeshanClientBuilder {
     /**
      * deactivate secured CoAP endpoint (DTLS)
      */
-    public LeshanClientBuilder disableSecuredEndpoint() {
+    public LeshanTCPClientBuilder disableSecuredEndpoint() {
         this.noSecuredEndpoint = true;
         return this;
     }
@@ -165,7 +160,7 @@ public class LeshanClientBuilder {
     /**
      * Set the additionalAttributes for {@link org.eclipse.leshan.core.request.RegisterRequest}.
      */
-    public LeshanClientBuilder setAdditionalAttributes(Map<String, String> additionalAttributes) {
+    public LeshanTCPClientBuilder setAdditionalAttributes(Map<String, String> additionalAttributes) {
         this.additionalAttributes = additionalAttributes;
         return this;
     }
@@ -197,67 +192,31 @@ public class LeshanClientBuilder {
         if (coapConfig == null) {
             coapConfig = createDefaultNetworkConfig();
         }
-
-        // handle dtlsConfig
-        DtlsConnectorConfig dtlsConfig = null;
-        if (dtlsConfigBuilder == null) {
-            dtlsConfigBuilder = new DtlsConnectorConfig.Builder();
-        }
-        DtlsConnectorConfig incompleteConfig = dtlsConfigBuilder.getIncompleteConfig();
+        coapConfig = NetworkConfig.createStandardWithoutFile()
+                .setLong(NetworkConfig.Keys.MAX_MESSAGE_SIZE, 16 * 1024)
+                .setInt(NetworkConfig.Keys.PROTOCOL_STAGE_THREAD_COUNT, 2)
+                .setLong(NetworkConfig.Keys.EXCHANGE_LIFETIME, 10000);
 
         // Handle PSK Store
         LwM2mObjectEnabler securityEnabler = this.objectEnablers.get(LwM2mId.SECURITY);
         if (securityEnabler == null) {
             throw new IllegalArgumentException("Security object is mandatory");
         }
-        if (incompleteConfig.getPskStore() == null) {
-            dtlsConfigBuilder.setPskStore(new SecurityObjectPskStore(securityEnabler));
-        } else {
-            LOG.warn("PskStore should be automatically set by Leshan. Using a custom implementation is not advised.");
-        }
-
-        // Handle secure address
-        if (incompleteConfig.getAddress() == null) {
-            if (localSecureAddress == null) {
-                localSecureAddress = new InetSocketAddress(0);
-            }
-            dtlsConfigBuilder.setAddress(localSecureAddress);
-        } else if (localSecureAddress != null && !localSecureAddress.equals(incompleteConfig.getAddress())) {
-            throw new IllegalStateException(String.format(
-                    "Configuration conflict between LeshanBuilder and DtlsConnectorConfig.Builder for secure address: %s != %s",
-                    localSecureAddress, incompleteConfig.getAddress()));
-        }
-
-        // Handle active peers
-        if (incompleteConfig.getMaxConnections() == null)
-            dtlsConfigBuilder.setMaxConnections(coapConfig.getInt(Keys.MAX_ACTIVE_PEERS));
-        if (incompleteConfig.getStaleConnectionThreshold() == null)
-            dtlsConfigBuilder.setStaleConnectionThreshold(coapConfig.getLong(Keys.MAX_PEER_INACTIVITY_PERIOD));
-
-        // Use only 1 thread to handle DTLS connection by default
-        if (incompleteConfig.getConnectionThreadCount() == null) {
-            dtlsConfigBuilder.setConnectionThreadCount(1);
-        }
-
-        dtlsConfig = dtlsConfigBuilder.build();
 
         // create endpoints
         CoapEndpoint unsecuredEndpoint = null;
         if (!noUnsecuredEndpoint) {
-            if (endpointFactory != null) {
-                unsecuredEndpoint = endpointFactory.createUnsecuredEndpoint(localAddress, coapConfig, null);
-            } else {
-                unsecuredEndpoint = new CoapEndpoint(localAddress, coapConfig);
-            }
+            LOG.debug("TCP: Creating unsecuredEndpoint");
+            TcpClientConnector tcpClientConnector = new TcpClientConnector(1, 100000, 100);
+            unsecuredEndpoint = new CoapEndpoint(tcpClientConnector, coapConfig);
         }
 
         CoapEndpoint securedEndpoint = null;
         if (!noSecuredEndpoint) {
-            if (endpointFactory != null) {
-                securedEndpoint = endpointFactory.createSecuredEndpoint(dtlsConfig, coapConfig, null);
-            } else {
-                securedEndpoint = new CoapEndpoint(new DTLSConnector(dtlsConfig), coapConfig, null, null);
-            }
+            LOG.debug("TCP: Creating securedEndpoint");
+            // Create CoAP secure endpoint
+            TlsClientConnector tlsClientConnector = new TlsClientConnector(sslContext, 1, 100000, 100);
+            securedEndpoint = new CoapEndpoint(tlsClientConnector, coapConfig);
         }
 
         if (securedEndpoint == null && unsecuredEndpoint == null) {

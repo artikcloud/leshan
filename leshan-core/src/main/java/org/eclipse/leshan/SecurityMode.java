@@ -19,7 +19,8 @@ package org.eclipse.leshan;
  * The different DTLS security modes
  */
 public enum SecurityMode {
-    PSK(0), RPK(1), X509(2), NO_SEC(3);
+    // TODO: ask JOMA what is EST?
+    PSK(0), RPK(1), X509(2), NO_SEC(3), CERT_WITH_EST_MODE(4);
 
     public final int code;
 

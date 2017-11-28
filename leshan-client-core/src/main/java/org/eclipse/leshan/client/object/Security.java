@@ -102,6 +102,33 @@ public class Security extends BaseInstanceEnabler {
                 clientPrivateKey.clone(), shortServerId);
     }
 
+    /**
+     * Returns a new security instance (X.509 Certificate) for a device management server.
+     */
+    public static Security certificate(String serverUri, int shortServerId, byte[] clientCertificate, byte[] clientPrivateKey, byte[] serverCertificate) {
+        return new Security(serverUri,
+                false,
+                SecurityMode.X509.code,
+                clientCertificate.clone(),
+                serverCertificate.clone(),
+                clientPrivateKey.clone(),
+                shortServerId);
+    }
+
+    /**
+     * Returns a new security instance (TCP) for a device management server.
+     */
+    public static Security tcp(String serverUri, int shortServerId) {
+        return new Security(serverUri, false, SecurityMode.NO_SEC.code, new byte[0], new byte[0], new byte[0], shortServerId);
+    }
+
+    /**
+     * Returns a new security instance (TLS) for a device management server.
+     */
+    public static Security tls(String serverUri, int shortServerId) {
+        return new Security(serverUri, false, SecurityMode.X509.code, new byte[0], new byte[0], new byte[0], shortServerId);
+    }
+
     @Override
     public WriteResponse write(int resourceId, LwM2mResource value) {
         LOG.debug("Write on resource {}: {}", resourceId, value);

@@ -28,6 +28,7 @@ import org.eclipse.leshan.core.node.LwM2mNode;
 import org.eclipse.leshan.core.observation.Observation;
 import org.eclipse.leshan.core.response.ObserveResponse;
 import org.eclipse.leshan.server.californium.impl.LeshanServer;
+import org.eclipse.leshan.server.californium.impl.LeshanTCPServer;
 import org.eclipse.leshan.server.demo.servlet.json.LwM2mNodeSerializer;
 import org.eclipse.leshan.server.demo.servlet.json.RegistrationSerializer;
 import org.eclipse.leshan.server.demo.servlet.log.CoapMessage;
@@ -130,6 +131,23 @@ public class EventServlet extends EventSourceServlet {
     };
 
     public EventServlet(LeshanServer server, int securePort) {
+        server.getRegistrationService().addListener(this.registrationListener);
+        server.getObservationService().addListener(this.observationListener);
+
+        // add an interceptor to each endpoint to trace all CoAP messages
+        coapMessageTracer = new CoapMessageTracer(server.getRegistrationService());
+        for (Endpoint endpoint : server.getCoapServer().getEndpoints()) {
+            endpoint.addInterceptor(coapMessageTracer);
+        }
+
+        GsonBuilder gsonBuilder = new GsonBuilder();
+        gsonBuilder.registerTypeHierarchyAdapter(Registration.class, new RegistrationSerializer(securePort));
+        gsonBuilder.registerTypeHierarchyAdapter(LwM2mNode.class, new LwM2mNodeSerializer());
+        gsonBuilder.setDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX");
+        this.gson = gsonBuilder.create();
+    }
+
+    public EventServlet(LeshanTCPServer server, int securePort) {
         server.getRegistrationService().addListener(this.registrationListener);
         server.getObservationService().addListener(this.observationListener);
 
