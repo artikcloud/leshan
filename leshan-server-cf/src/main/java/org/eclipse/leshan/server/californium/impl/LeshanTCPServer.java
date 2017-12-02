@@ -140,6 +140,7 @@ public class LeshanTCPServer implements LwM2mServer {
         // default endpoint
         this.unsecuredEndpoint = unsecuredEndpoint;
         if (unsecuredEndpoint != null) {
+            LOG.info("TCP: Adding unsecured endpoint");
             unsecuredEndpoint.addNotificationListener(observationService);
             observationService.setNonSecureEndpoint(unsecuredEndpoint);
             coapServer.addEndpoint(unsecuredEndpoint);
@@ -149,6 +150,7 @@ public class LeshanTCPServer implements LwM2mServer {
         // secure endpoint
         this.securedEndpoint = securedEndpoint;
         if (securedEndpoint != null) {
+            LOG.info("TCP: Adding secured endpoint");
             securedEndpoint.addNotificationListener(observationService);
             observationService.setSecureEndpoint(securedEndpoint);
             coapServer.addEndpoint(securedEndpoint);

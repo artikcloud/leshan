@@ -35,9 +35,14 @@ import org.eclipse.leshan.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.File;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Scanner;
 
@@ -56,7 +61,7 @@ public class LeshanTCPClientDemo {
 
     private static MyLocation locationInstance;
 
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws Exception {
 
         // Define options for command line tools
         Options options = new Options();
@@ -138,10 +143,11 @@ public class LeshanTCPClientDemo {
             else
                 serverURI = "coap+tcp://localhost:" + LwM2m.DEFAULT_COAP_PORT;
         }
+        serverURI = "coaps+tcp://localhost:5689";
 
         // get security info
-        byte[] pskIdentity = null;
-        byte[] pskKey = null;
+        byte[] pskIdentity = "alexis-identity".getBytes();
+        byte[] pskKey = "alexis-key".getBytes();
         if (cl.hasOption("i") && cl.hasOption("p")) {
             pskIdentity = cl.getOptionValue("i").getBytes();
             pskKey = Hex.decodeHex(cl.getOptionValue("p").toCharArray());
@@ -204,7 +210,7 @@ public class LeshanTCPClientDemo {
 
     public static void createAndStartClient(String endpoint, String localAddress, int localPort,
             String secureLocalAddress, int secureLocalPort, boolean needBootstrap, String serverURI, byte[] pskIdentity,
-            byte[] pskKey, Float latitude, Float longitude, float scaleFactor) {
+            byte[] pskKey, Float latitude, Float longitude, float scaleFactor) throws Exception {
 
         locationInstance = new MyLocation(latitude, longitude, scaleFactor);
 
@@ -221,11 +227,11 @@ public class LeshanTCPClientDemo {
                 initializer.setInstancesForObject(SECURITY, pskBootstrap(serverURI, pskIdentity, pskKey));
         } else {
             if (pskIdentity == null) {
-                initializer.setInstancesForObject(SECURITY, noSec(serverURI, 123));
-                initializer.setInstancesForObject(SERVER, new Server(123, 30, BindingMode.U, false));
+                initializer.setInstancesForObject(SECURITY, tcp(serverURI, 123));
+                initializer.setInstancesForObject(SERVER, new Server(123, 30, BindingMode.T, false));
             } else {
-                initializer.setInstancesForObject(SECURITY, psk(serverURI, 123, pskIdentity, pskKey));
-                initializer.setInstancesForObject(SERVER, new Server(123, 30, BindingMode.U, false));
+                initializer.setInstancesForObject(SECURITY, tls(serverURI, 123));
+                initializer.setInstancesForObject(SERVER, new Server(123, 30, BindingMode.T, false));
             }
         }
         initializer.setClassForObject(DEVICE, MyDevice.class);
@@ -254,10 +260,12 @@ public class LeshanTCPClientDemo {
         // if we don't use bootstrap, client will always use the same unique endpoint
         // so we can disable the other one.
         if (!needBootstrap) {
-            if (pskIdentity == null)
+            if (pskIdentity == null) {
                 builder.disableSecuredEndpoint();
-            else
+            } else {
                 builder.disableUnsecuredEndpoint();
+                builder.setSSLContext(getSSLContext());
+            }
         }
         final LeshanClient client = builder.build();
 
@@ -282,5 +290,31 @@ public class LeshanTCPClientDemo {
                 locationInstance.moveLocation(nextMove);
             }
         }
+    }
+
+    private static SSLContext getSSLContext() throws Exception {
+        TrustManager[] trustAllCerts = new TrustManager[]{
+                new X509TrustManager() {
+                    @Override
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new X509Certificate[0];
+                    }
+
+                    @Override
+                    public void checkClientTrusted(
+                            java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+
+                    @Override
+                    public void checkServerTrusted(
+                            java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+                }
+        };
+
+        LOG.info("TCP: Build SSLContext");
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(null, trustAllCerts, new SecureRandom());
+        return sslContext;
     }
 }

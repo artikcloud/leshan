@@ -48,9 +48,14 @@ import org.slf4j.LoggerFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.util.Pool;
+import sun.security.provider.certpath.X509CertPath;
 
 import javax.jmdns.JmDNS;
 import javax.jmdns.ServiceInfo;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -101,6 +106,66 @@ public class LeshanTCPServerDemo {
     private final static String DEFAULT_KEYSTORE_TYPE = KeyStore.getDefaultType();
 
     private final static String DEFAULT_KEYSTORE_ALIAS = "leshan";
+
+    private static SSLContext getSSLContext() {
+        TrustManager[] trustAllCerts = new TrustManager[]{
+                new X509TrustManager() {
+                    @Override
+                    public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                        return new X509Certificate[0];
+                    }
+
+                    @Override
+                    public void checkClientTrusted(
+                            java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+
+                    @Override
+                    public void checkServerTrusted(
+                            java.security.cert.X509Certificate[] certs, String authType) {
+                    }
+                }
+        };
+
+        LOG.info("TCP: Using TLS");
+
+        try {
+            final String keyStoreLocation = "/home/dell/Desktop/certs/new2/keyStore.jks";
+            final String keyStorePassword = "123456";
+            final String keyStoreAlias = "server";
+            final FileInputStream keyStoreInputStream = new FileInputStream(keyStoreLocation);
+
+            KeyStore keyStore = KeyStore.getInstance("JKS");
+            keyStore.load(keyStoreInputStream, keyStorePassword.toCharArray());
+            PrivateKey privateKey = (PrivateKey)keyStore.getKey(keyStoreAlias, keyStorePassword.toCharArray());
+            Certificate[] certChain = keyStore.getCertificateChain(keyStoreAlias);
+
+            KeyStore keystore = KeyStore.getInstance("JKS");
+            keystore.load(null);
+            Certificate serverCert = certChain[0];
+            keystore.setCertificateEntry(keyStoreAlias, serverCert);
+            keystore.setKeyEntry("key", privateKey, keyStorePassword.toCharArray(), certChain);
+
+
+            KeyManagerFactory kmf = createKeyManagerFactory(keystore, keyStorePassword.toCharArray());
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(kmf.getKeyManagers(), trustAllCerts, new SecureRandom());
+            return sslContext;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    private static KeyManagerFactory createKeyManagerFactory(KeyStore keyStore, char[] password) {
+        try {
+            KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance("PKIX");
+            keyManagerFactory.init(keyStore, password);
+
+            return keyManagerFactory;
+        } catch (NoSuchAlgorithmException | KeyStoreException | UnrecoverableKeyException ex) {
+            throw new RuntimeException("Unable to create Key Manager Factory", ex);
+        }
+    }
 
     public static void main(String[] args) {
         // Define options for command line tools
@@ -163,7 +228,7 @@ public class LeshanTCPServerDemo {
         // get secure local address
         String secureLocalAddress = cl.getOptionValue("slh");
         String secureLocalPortOption = cl.getOptionValue("slp");
-        int secureLocalPort = LwM2m.DEFAULT_COAP_SECURE_PORT;
+        int secureLocalPort = LeshanTCPServerBuilder.DEFAULT_TLS_PORT;
         if (secureLocalPortOption != null) {
             secureLocalPort = Integer.parseInt(secureLocalPortOption);
         }
@@ -210,6 +275,9 @@ public class LeshanTCPServerDemo {
             throws Exception {
         // Prepare LWM2M server
         LeshanTCPServerBuilder builder = new LeshanTCPServerBuilder();
+        builder.disableUnsecuredEndpoint();
+        builder.setSSLContext(getSSLContext());
+
         builder.setLocalAddress(localAddress, localPort);
         builder.setLocalSecureAddress(secureLocalAddress, secureLocalPort);
         builder.setEncoder(new DefaultLwM2mNodeEncoder());

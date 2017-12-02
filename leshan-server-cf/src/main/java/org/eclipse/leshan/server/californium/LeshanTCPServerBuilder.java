@@ -117,7 +117,7 @@ public class LeshanTCPServerBuilder {
 
     /**
      * <p>
-     * Set the address for secured CoAP Server (Using DTLS).
+     * Set the address for secured CoAP Server (Using TLS).
      * </p>
      *
      * By default a wildcard address and the default CoAP port(5684) is used.
@@ -273,11 +273,13 @@ public class LeshanTCPServerBuilder {
         return networkConfig;
     }
 
+    public static final int DEFAULT_TLS_PORT = 5689;
+
     public LeshanTCPServer build() {
         if (localAddress == null)
             localAddress = new InetSocketAddress(LwM2m.DEFAULT_COAP_PORT);
         if (localSecureAddress == null)
-            localSecureAddress = new InetSocketAddress(LwM2m.DEFAULT_COAP_SECURE_PORT);
+            localSecureAddress = new InetSocketAddress(DEFAULT_TLS_PORT);
         if (registrationStore == null)
             registrationStore = new InMemoryRegistrationStore();
         if (authorizer == null)
@@ -300,6 +302,7 @@ public class LeshanTCPServerBuilder {
 
         CoapEndpoint unsecuredEndpoint = null;
         if (!noUnsecuredEndpoint) {
+            LOG.info("TCP: Creating unsecured endpoint: " + localAddress);
             // TODO: We might be able to create the tcp endpoint using a custom factory
             final TcpServerConnector tcpServerConnector = new TcpServerConnector(localAddress, 100, 1);
             unsecuredEndpoint = new CoapEndpoint(tcpServerConnector, coapConfig, registrationStore, null);
@@ -307,6 +310,7 @@ public class LeshanTCPServerBuilder {
 
         CoapEndpoint securedEndpoint = null;
         if (!noSecuredEndpoint) {
+            LOG.info("TCP: Creating secured endpoint: " + localSecureAddress);
             // TODO: We might be able to create the tcp endpoint using a custom factory
             final TlsServerConnector tlsServerConnector = new TlsServerConnector(sslContext, localSecureAddress, 100, 1);
             securedEndpoint = new CoapEndpoint(tlsServerConnector, coapConfig, registrationStore, null);
