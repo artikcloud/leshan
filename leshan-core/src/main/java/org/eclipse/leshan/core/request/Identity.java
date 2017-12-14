@@ -20,6 +20,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.security.PublicKey;
 
+import org.eclipse.californium.scandium.auth.X509CertPath;
 import org.eclipse.leshan.util.Validate;
 
 /**
@@ -31,13 +32,15 @@ public class Identity {
     private final String pskIdentity;
     private final PublicKey rawPublicKey;
     private final String x509CommonName;
+    private final X509CertPath x509CertPath;
 
-    private Identity(InetSocketAddress peerAddress, String pskIdentity, PublicKey rawPublicKey, String x509CommonName) {
+    private Identity(InetSocketAddress peerAddress, String pskIdentity, PublicKey rawPublicKey, String x509CommonName, X509CertPath x509CertPath) {
         Validate.notNull(peerAddress);
         this.peerAddress = peerAddress;
         this.pskIdentity = pskIdentity;
         this.rawPublicKey = rawPublicKey;
         this.x509CommonName = x509CommonName;
+        this.x509CertPath = x509CertPath;
     }
 
     protected Identity(Identity identity) {
@@ -45,6 +48,7 @@ public class Identity {
         this.pskIdentity = identity.pskIdentity;
         this.rawPublicKey = identity.rawPublicKey;
         this.x509CommonName = identity.x509CommonName;
+        this.x509CertPath = identity.x509CertPath;
     }
 
     public InetSocketAddress getPeerAddress() {
@@ -61,6 +65,10 @@ public class Identity {
 
     public String getX509CommonName() {
         return x509CommonName;
+    }
+
+    public X509CertPath getX509CertPath() {
+        return x509CertPath;
     }
 
     public boolean isPSK() {
@@ -80,35 +88,35 @@ public class Identity {
     }
 
     public static Identity unsecure(InetSocketAddress peerAddress) {
-        return new Identity(peerAddress, null, null, null);
+        return new Identity(peerAddress, null, null, null, null);
     }
 
     public static Identity unsecure(InetAddress address, int port) {
-        return new Identity(new InetSocketAddress(address, port), null, null, null);
+        return new Identity(new InetSocketAddress(address, port), null, null, null, null);
     }
 
     public static Identity psk(InetSocketAddress peerAddress, String identity) {
-        return new Identity(peerAddress, identity, null, null);
+        return new Identity(peerAddress, identity, null, null, null);
     }
 
     public static Identity psk(InetAddress address, int port, String identity) {
-        return new Identity(new InetSocketAddress(address, port), identity, null, null);
+        return new Identity(new InetSocketAddress(address, port), identity, null, null, null);
     }
 
     public static Identity rpk(InetSocketAddress peerAddress, PublicKey publicKey) {
-        return new Identity(peerAddress, null, publicKey, null);
+        return new Identity(peerAddress, null, publicKey, null, null);
     }
 
     public static Identity rpk(InetAddress address, int port, PublicKey publicKey) {
-        return new Identity(new InetSocketAddress(address, port), null, publicKey, null);
+        return new Identity(new InetSocketAddress(address, port), null, publicKey, null, null);
     }
 
-    public static Identity x509(InetSocketAddress peerAddress, String commonName) {
-        return new Identity(peerAddress, null, null, commonName);
+    public static Identity x509(InetSocketAddress peerAddress, String commonName, X509CertPath x509CertPath) {
+        return new Identity(peerAddress, null, null, commonName, x509CertPath);
     }
 
-    public static Identity x509(InetAddress address, int port, String commonName) {
-        return new Identity(new InetSocketAddress(address, port), null, null, commonName);
+    public static Identity x509(InetAddress address, int port, String commonName, X509CertPath x509CertPath) {
+        return new Identity(new InetSocketAddress(address, port), null, null, commonName, x509CertPath);
     }
 
     @Override

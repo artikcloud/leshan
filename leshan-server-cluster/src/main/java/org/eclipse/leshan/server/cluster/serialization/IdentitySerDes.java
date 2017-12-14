@@ -23,6 +23,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
 
 import org.eclipse.californium.elements.EndpointContext;
+import org.eclipse.californium.scandium.auth.X509CertPath;
 import org.eclipse.leshan.core.request.Identity;
 import org.eclipse.leshan.util.Hex;
 
@@ -39,6 +40,7 @@ public class IdentitySerDes {
     private static final String KEY_PORT = "port";
     private static final String KEY_ID = "id";
     private static final String KEY_CN = "cn";
+    private static final String KEY_CERTPATH = "certpath";
     private static final String KEY_RPK = "rpk";
 
     public static JsonObject serialize(Identity identity) {
@@ -52,6 +54,7 @@ public class IdentitySerDes {
             o.set(KEY_RPK, Hex.encodeHexString(publicKey.getEncoded()));
         } else if (identity.isX509()) {
             o.set(KEY_CN, identity.getX509CommonName());
+            o.set(KEY_CERTPATH, Hex.encodeHexString(identity.getX509CertPath().toByteArray()));
         }
         return o;
     }
@@ -79,7 +82,9 @@ public class IdentitySerDes {
 
         JsonValue jcn = peer.get(KEY_CN);
         if (jcn != null) {
-            return Identity.x509(new InetSocketAddress(address, port), jcn.asString());
+            JsonValue jCertPath = peer.get(KEY_CERTPATH);
+            X509CertPath certPath = X509CertPath.fromBytes(Hex.decodeHex(jCertPath.asString().toCharArray()));
+            return Identity.x509(new InetSocketAddress(address, port), jcn.asString(), certPath);
         }
 
         return Identity.unsecure(new InetSocketAddress(address, port));

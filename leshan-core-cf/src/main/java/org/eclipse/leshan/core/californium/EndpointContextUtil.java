@@ -46,7 +46,8 @@ public class EndpointContextUtil {
             } else if (senderIdentity instanceof X500Principal || senderIdentity instanceof X509CertPath) {
                 // Extract common name
                 String x509CommonName = extractCN(senderIdentity.getName());
-                return Identity.x509(peerAddress, x509CommonName);
+                X509CertPath certPath = extractX509CertPath(senderIdentity);
+                return Identity.x509(peerAddress, x509CommonName, certPath);
             }
             throw new IllegalStateException("Unable to extract sender identity : unexpected type of Principal");
         }
@@ -89,6 +90,14 @@ public class EndpointContextUtil {
         } else {
             throw new IllegalStateException(
                     "Unable to extract sender identity : can not get common name in certificate");
+        }
+    }
+
+    private static X509CertPath extractX509CertPath(Principal senderIdentity) {
+        if (senderIdentity instanceof X509CertPath) {
+            return (X509CertPath)senderIdentity;
+        } else {
+            return null;
         }
     }
 }
