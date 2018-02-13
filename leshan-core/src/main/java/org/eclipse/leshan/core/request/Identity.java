@@ -19,7 +19,7 @@ package org.eclipse.leshan.core.request;
 import java.net.InetSocketAddress;
 import java.security.PublicKey;
 
-import org.eclipse.californium.scandium.auth.X509CertPath;
+import org.eclipse.californium.elements.auth.X509CertPath;
 import org.eclipse.leshan.util.Validate;
 
 /**
