@@ -1,3 +1,16 @@
+# Leshan-Artik
+Please note that this is a fork from [leshan-1.0.0-M4](https://github.com/eclipse/leshan/tree/leshan-1.0.0-M4) which depends on [californium-2.0.0-M5-ARTIK](https://github.com/artikcloud/californium/tree/2.0.0-M5-Artik).
+
+We have added support for TCP and client certificates.
+
+The specific changes are:
+- Added the TCP Binding Mode: https://github.com/artikcloud/leshan/commit/b3e8eee9c685ae089967ea8f99476f3da911ccc1
+- Added the `certificate` (client certificate), `tcp` and `tls` security modes: https://github.com/artikcloud/leshan/commit/de14c8d7fec201b47db841c2510026ac1e3de78e
+- Added the peer certificate chain to the `Identity`: https://github.com/artikcloud/leshan/commit/d935964cd67fe92539fbba1a18c63f1c2cde80ea
+
+In order to see the usage for these features, please take a look to our [Artik Java SDK](https://github.com/artikcloud/artikcloud-lwm2m-java/tree/leshan-1.0.0-artik).
+
+# Leshan
 [Build Status](https://hudson.eclipse.org/leshan/)
 
 ![Leshan](https://eclipse.org/leshan/img/multicolor-leshan.png)
